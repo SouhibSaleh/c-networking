@@ -16,9 +16,6 @@ int main(void) {
     int network_to_host_short = ntohs(host_to_network_short);
     int network_to_host_long = ntohs(host_to_network_long);
 
-    printf("host_to_network_short = %d\n", network_to_host_short);
-    printf("host_to_network_long = %d\n", network_to_host_long);
-
     struct addrinfo hints;
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_UNSPEC;
@@ -40,14 +37,14 @@ int main(void) {
             if (inet_ntop(AF_INET, &ip4->sin_addr, address, sizeof(address)) == NULL) {
                 perror("inet_ntop");
             } else {
-                printf("%s, %s\n", address, a->ai_canonname);
+                printf("address: %s , canonical name: %s, port: %d\n", address, a->ai_canonname, ntohs(ip4->sin_port));
             }
         }else if (a->ai_family == AF_INET6) {
             const struct sockaddr_in6* ip6= (struct sockaddr_in6*)a->ai_addr;
             if (inet_ntop(AF_INET6, &ip6->sin6_addr, address, sizeof(address)) == NULL) {
                 perror("inet_ntop");
             } else {
-                printf("%s, %s\n", address, a->ai_canonname);
+                printf("address: %s , canonical name: %s, port: %d\n", address, a->ai_canonname, ntohs(ip6->sin6_port));
             }
         }
 
