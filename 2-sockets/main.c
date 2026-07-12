@@ -69,6 +69,7 @@ int main(void) {
     printf("domain: %d, type: %d, protocol: %d\n",res->ai_family, res->ai_socktype, res->ai_protocol);
     const int sd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 
+
     if (sd == -1) {
         perror("socket failed");
     }
