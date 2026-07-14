@@ -1,0 +1,8 @@
+[
+{
+  "directory": "/Users/suhibsaleh/Desktop/c-playground/intro/cmake-build-debug",
+  "command": "/usr/bin/cc -g -std=gnu11 -arch arm64 -fcolor-diagnostics -o CMakeFiles/intro.dir/main.c.o -c /Users/suhibsaleh/Desktop/c-playground/intro/main.c",
+  "file": "/Users/suhibsaleh/Desktop/c-playground/intro/main.c",
+  "output": "/Users/suhibsaleh/Desktop/c-playground/intro/cmake-build-debug/CMakeFiles/intro.dir/main.c.o"
+}
+]

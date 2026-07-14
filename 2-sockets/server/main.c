@@ -8,6 +8,9 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <errno.h>
+#include <pthread.h>
+#include <signal.h>
+#include <stdbool.h>
 
 #define ERROR(operation, context) \
     fprintf(stderr, "[ERROR] Operation: %s | Context: %s | errno: %d\n", operation, context, errno)
@@ -15,52 +18,41 @@
 #define GAI_ERROR(operation, context, status) \
     fprintf(stderr, "[ERROR] Operation: %s | Context: %s | Details: %s\n", operation, context, gai_strerror(status))
 
-void connect_to_server() {
-    struct addrinfo hints, *res;
-    int sockfd;
-    int status;
+volatile sig_atomic_t running = 1;
 
-    memset(&hints, 0, sizeof hints);
-    hints.ai_family = AF_UNSPEC;
-    hints.ai_socktype = SOCK_STREAM;
-
-    status = getaddrinfo("127.0.0.1", "4433", &hints, &res);
-    if (status != 0) {
-        GAI_ERROR("getaddrinfo", "Resolving server address (127.0.0.1:4433)", status);
-        return;
-    }
-
-    sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
-    if (sockfd == -1) {
-        ERROR("socket", "Creating client socket");
-        freeaddrinfo(res);
-        return;
-    }
-
-    if (connect(sockfd, res->ai_addr, res->ai_addrlen) == -1) {
-        ERROR("connect", "Connecting to server (127.0.0.1:4433)");
-        close(sockfd);
-        freeaddrinfo(res);
-        return;
-    }
-
-    printf("[INFO] Successfully connected to server!\n");
-
-    const char *msg = "message";
-
-    ssize_t sent_size = send(sockfd, msg, strlen(msg), 0);
-    if (sent_size == -1) {
-        ERROR("send", "Sending message to server");
-    } else {
-        printf("[INFO] Message sent: %ld bytes (expected: %ld bytes)\n", sent_size, strlen(msg));
-    }
-
-    close(sockfd);
-    freeaddrinfo(res);
+void signal_handler(int sig)
+{
+    running = 0;
 }
 
+void *handle_server_request(void *arg) {
+    pthread_detach(pthread_self());
+    char buffer[4];
+    int client_fd = *(int *)arg;
+
+    ssize_t n;
+    while ((n = recv(client_fd, buffer, sizeof(buffer)-1, 0))>0) {
+        printf("Received %zd bytes\n", n);
+        if (n >0) {
+            buffer[n] = '\0';
+        }
+        printf("Received: %s\n", buffer);
+    }
+
+    return NULL;
+}
 
 int main(void) {
+
+    pthread_t handle_thread;
+
+    struct sigaction sa;
+    sa.sa_handler = signal_handler;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0;
+
+    sigaction(SIGINT, &sa, NULL);
+    sigaction(SIGTERM, &sa, NULL);
 
     struct addrinfo hints, *res;
 
@@ -70,8 +62,8 @@ int main(void) {
     hints.ai_flags = AI_PASSIVE;
 
     int status = 0;
-    if ((status = getaddrinfo(NULL, "3490", &hints, &res)) != 0) {
-        GAI_ERROR("getaddrinfo", "Setting up server address info on port 3490", status);
+    if ((status = getaddrinfo(NULL, "4433", &hints, &res)) != 0) {
+        GAI_ERROR("getaddrinfo", "Setting up server address info on port 4433", status);
         exit(1);
     }
     printf("[INFO] Address info configured: domain=%d, type=%d, protocol=%d\n",
@@ -107,17 +99,32 @@ int main(void) {
     socklen_t req_addr_size = sizeof req_addr;
 
     printf("[INFO] Waiting for incoming connection...\n");
-    int new_fd = accept(sd, (struct sockaddr *)&req_addr, &req_addr_size);
-    if (new_fd == -1) {
-        ERROR("accept", "Accepting incoming connection");
-        close(sd);
-        freeaddrinfo(res);
-        exit(1);
-    }
-    printf("[INFO] Accepted connection (new fd=%d)\n", new_fd);
+    while (running) {
+        int client_fd = accept(sd, (struct sockaddr *)&req_addr, &req_addr_size);
 
-    close(new_fd);
+        if (!running)break;
+
+        if (client_fd == -1) {
+            ERROR("accept", "Accepting incoming connection");
+            close(sd);
+            freeaddrinfo(res);
+            exit(1);
+        }
+        printf("[INFO] Accepted connection (new fd=%d)\n", client_fd);
+
+        void *p = &client_fd;
+        pthread_create(
+            &handle_thread,           // thread handle
+            NULL,              // default attributes
+            handle_server_request,   // function to run
+            p               // argument passed to function
+            );
+    }
+
+    printf("[INFO] Cleaning allocated memory\n");
+
     close(sd);
     freeaddrinfo(res);
+
     return 0;
 }
