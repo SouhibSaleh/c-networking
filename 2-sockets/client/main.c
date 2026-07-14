@@ -1,5 +1,4 @@
 #include <stdio.h>
-#include <sys/_endian.h>
 #include <sys/socket.h>
 #include <netdb.h>
 #include <stdlib.h>
@@ -22,11 +21,6 @@ void signal_handler(int sig)
     running = 0;
 }
 
-struct connect_response {
-    int client_sock;
-    int err;
-};
-
 struct addrinfo* resolve_address() {
     struct addrinfo hints, *res;
 
@@ -34,38 +28,36 @@ struct addrinfo* resolve_address() {
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
 
-    const int status = getaddrinfo("0.0.0.0", "4433", &hints, &res);
+    const int status = getaddrinfo("127.0.0.1", "4433", &hints, &res);
     if (status != 0) {
         GAI_ERROR("getaddrinfo", "Resolving server address (127.0.0.1:4433)", status);
+        return NULL;
     }
     return res;
 }
 
 
-struct connect_response* connect_to_server(struct addrinfo* addr_info) {
+int connect_to_server(struct addrinfo* addr_info) {
 
-    struct connect_response *resp = malloc(sizeof(struct connect_response));
-    resp->err = 1;
 
-    const int sockfd = socket(addr_info->ai_family, addr_info->ai_socktype, addr_info->ai_protocol);
+    int sockfd = socket(addr_info->ai_family, addr_info->ai_socktype, addr_info->ai_protocol);
     if (sockfd == -1) {
         ERROR("socket", "Creating client socket");
         freeaddrinfo(addr_info);
-        return resp;
+        return sockfd;
     }
 
     if (connect(sockfd, addr_info->ai_addr, addr_info->ai_addrlen) == -1) {
         ERROR("connect", "Connecting to server (127.0.0.1:4433)");
         close(sockfd);
         freeaddrinfo(addr_info);
-        return resp;
+        sockfd = -1;
+        return sockfd;
     }
 
     printf("[INFO] Successfully connected to server!\n");
 
-    resp->err = 0;
-    resp->client_sock = sockfd;
-    return resp;
+    return sockfd;
 }
 
 void send_message(int client_fd,char *message,size_t message_len) {
@@ -90,22 +82,24 @@ int main(void) {
 
 
     struct addrinfo* res_add = resolve_address();
-    struct connect_response *resp =  connect_to_server(res_add);
+    if (res_add == NULL) {
+        return 0;
+    }
+    int client_fd =  connect_to_server(res_add);
 
-    if (!resp->err) {
-        while (true) {
-            if (!running)break;
+    if (client_fd != -1) {
+        while (running) {
             char message[128];
             scanf("%99s", message);
-
-            send_message(resp->client_sock,message,strlen(message));
+            send_message(client_fd,message,strlen(message));
         }
+        printf("[INFO] Cleaning allocated memory\n");
+
+        close(client_fd);
+        freeaddrinfo(res_add);
     }
 
-    printf("[INFO] Cleaning allocated memory\n");
 
-    free(resp);
-    freeaddrinfo(res_add);
 
 
     return 0;
