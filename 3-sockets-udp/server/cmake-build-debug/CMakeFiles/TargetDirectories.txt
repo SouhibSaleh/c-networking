@@ -1,0 +1,3 @@
+/Users/suhibsaleh/Desktop/c-playground/intro/cmake-build-debug/CMakeFiles/intro.dir
+/Users/suhibsaleh/Desktop/c-playground/intro/cmake-build-debug/CMakeFiles/edit_cache.dir
+/Users/suhibsaleh/Desktop/c-playground/intro/cmake-build-debug/CMakeFiles/rebuild_cache.dir
